@@ -1,0 +1,197 @@
+---
+title: Quickstart
+description: Bootstrap a new Hono project, define type-safe API routes, and verify your first endpoint in under 5 minutes.
+---
+
+This quickstart guides you through creating a working Hono REST API with schema validation, starting the development server, and verifying the live output with `curl`.
+
+## Prerequisites
+
+Before beginning, ensure you have the following installed on your machine:
+
+- **Node.js**: Version `18.14.1` or higher (Node 20+ or 22+ recommended), or **Bun** (`>= 1.0.0`)
+- **Package Manager**: `npm`, `pnpm`, or `bun`
+- A terminal shell with `curl` installed for endpoint verification
+
+---
+
+<Steps>
+  <Step title="Scaffold a new Hono project">
+    Run the official Hono interactive project generator in your terminal:
+
+    <Tabs>
+      <Tab title="npm">
+        ```bash
+        npm create hono@latest my-hono-api
+        ```
+      </Tab>
+      <Tab title="pnpm">
+        ```bash
+        pnpm create hono my-hono-api
+        ```
+      </Tab>
+      <Tab title="bun">
+        ```bash
+        bun create hono my-hono-api
+        ```
+      </Tab>
+    </Tabs>
+
+    When prompted:
+    1. **Target runtime**: Select `nodejs` (or your preferred runtime such as `cloudflare-workers` or `bun`).
+    2. **Install dependencies**: Choose `Yes`.
+  </Step>
+
+  <Step title="Install schema validation dependencies">
+    Navigate into your new project directory and install `@hono/zod-validator` alongside `zod` to enable type-safe request validation:
+
+    ```bash
+    cd my-hono-api
+    npm install @hono/zod-validator zod
+    ```
+  </Step>
+
+  <Step title="Define your API routes and schema">
+    Open `src/index.ts` in your code editor and replace its contents with the following production-ready application code:
+
+    ```typescript
+    import { serve } from '@hono/node-server'
+    import { Hono } from 'hono'
+    import { logger } from 'hono/logger'
+    import { zValidator } from '@hono/zod-validator'
+    import { z } from 'zod'
+
+    // Initialize Hono application instance
+    const app = new Hono()
+
+    // Attach request logging middleware
+    app.use('*', logger())
+
+    // 1. Health check endpoint
+    app.get('/health', (c) => {
+      return c.json({
+        status: 'healthy',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // 2. Query schema definition
+    const querySchema = z.object({
+      name: z.string().min(2, 'Name must contain at least 2 characters'),
+      role: z.enum(['admin', 'member', 'guest']).default('member')
+    })
+
+    // 3. User greeting endpoint with input validation
+    app.get('/api/v1/greet', zValidator('query', querySchema), (c) => {
+      const { name, role } = c.req.valid('query')
+
+      return c.json({
+        success: true,
+        message: `Welcome to Hono, ${name}!`,
+        account: {
+          name,
+          role,
+          tier: role === 'admin' ? 'unlimited' : 'standard'
+        }
+      })
+    })
+
+    // Start local server on port 3000
+    const port = 3000
+    console.log(`Server is running on http://localhost:${port}`)
+
+    serve({
+      fetch: app.fetch,
+      port
+    })
+    ```
+  </Step>
+
+  <Step title="Start the development server">
+    Launch the local development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    You will see confirmation in your terminal:
+    ```output
+    Server is running on http://localhost:3000
+    ```
+  </Step>
+
+  <Step title="Verify the endpoint with curl">
+    Open a new terminal tab and send a request to verify that your service handles valid parameters:
+
+    ```bash
+    curl -s "http://localhost:3000/api/v1/greet?name=Apoorva&role=admin"
+    ```
+
+    **Expected response (HTTP 200 OK):**
+    ```json
+    {
+      "success": true,
+      "message": "Welcome to Hono, Apoorva!",
+      "account": {
+        "name": "Apoorva",
+        "role": "admin",
+        "tier": "unlimited"
+      }
+    }
+    ```
+
+    Now test validation by sending an invalid request with an unsupported role:
+
+    ```bash
+    curl -s -i "http://localhost:3000/api/v1/greet?name=A&role=superuser"
+    ```
+
+    **Expected response (HTTP 400 Bad Request):**
+    ```json
+    {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "too_small",
+            "minimum": 2,
+            "type": "string",
+            "inclusive": true,
+            "message": "Name must contain at least 2 characters",
+            "path": ["name"]
+          },
+          {
+            "code": "invalid_enum_value",
+            "options": ["admin", "member", "guest"],
+            "received": "superuser",
+            "message": "Invalid enum value",
+            "path": ["role"]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## What you accomplished
+
+In under five minutes, you:
+1. Created a high-performance Hono project with zero boilerplate overhead.
+2. Built two working endpoints: a `/health` check and a validated `/api/v1/greet` route.
+3. Implemented compile-time and runtime validation using Zod schemas.
+4. Tested live success and failure states via `curl`.
+
+---
+
+## Next steps
+
+Now that your basic API is operational, secure it with token-based access control:
+
+<Card title="Securing APIs with JWT Authentication" icon="shield-check" href="/guides/jwt-authentication">
+  Implement JSON Web Token signing, route protection middleware, custom context typing, and production troubleshooting.
+</Card>

@@ -1,0 +1,204 @@
+openapi: 3.1.0
+info:
+  title: Hono API Reference
+  version: 1.0.0
+  description: >-
+    Reference specification for the Hono REST API service, including health checks,
+    JWT authentication, and protected project resources.
+servers:
+  - url: https://api.example.com
+    description: Production API Server
+  - url: http://localhost:3000
+    description: Local Development Server
+tags:
+  - name: System
+    description: System health and operational metrics.
+  - name: Authentication
+    description: Issue and refresh JSON Web Tokens.
+  - name: Projects
+    description: Protected project management endpoints.
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [System]
+      summary: Health check
+      description: Returns service availability status, uptime, and system timestamp.
+      responses:
+        '200':
+          description: Service is healthy and operational.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  /auth/login:
+    post:
+      operationId: login
+      tags: [Authentication]
+      summary: User authentication
+      description: Validates user credentials and issues a signed JWT access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful. Returns signed JWT bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid email or password credentials.
+  /api/me:
+    get:
+      operationId: getCurrentUser
+      tags: [Authentication]
+      summary: Get current authenticated user
+      description: Decodes the JWT from the Authorization header and returns caller details.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully decoded JWT claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserClaims'
+        '401':
+          description: Missing, invalid, or expired JWT token.
+  /api/projects:
+    get:
+      operationId: listProjects
+      tags: [Projects]
+      summary: List all projects
+      description: Returns a list of projects accessible to the authenticated tenant.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of projects.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+    post:
+      operationId: createProject
+      tags: [Projects]
+      summary: Create a project
+      description: Creates a new project workspace. Requires admin role in JWT claims.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          description: Missing or invalid token.
+        '403':
+          description: Forbidden. Insufficient role permissions.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        uptime:
+          type: number
+          example: 1420.5
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-10-22T14:15:00.000Z'
+      required: [status, uptime, timestamp]
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+        password:
+          type: string
+          format: password
+          example: P@ssword123
+      required: [email, password]
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        token_type:
+          type: string
+          example: Bearer
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expires_in:
+          type: integer
+          example: 3600
+      required: [success, token_type, access_token, expires_in]
+    UserClaims:
+      type: object
+      properties:
+        sub:
+          type: string
+          example: usr_98124
+        email:
+          type: string
+          example: admin@example.com
+        role:
+          type: string
+          example: admin
+        exp:
+          type: integer
+          example: 1774300000
+      required: [sub, email, role, exp]
+    CreateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: NextGen Core API
+        description:
+          type: string
+          example: Primary microservices repository
+      required: [name]
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          example: prj_918234
+        name:
+          type: string
+          example: NextGen Core API
+        createdBy:
+          type: string
+          example: admin@example.com
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-10-22T14:20:00.000Z'
+      required: [id, name, createdBy, createdAt]

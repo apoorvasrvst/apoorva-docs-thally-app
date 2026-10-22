@@ -1,0 +1,30 @@
+---
+title: API Overview
+navTitle: Overview
+description: Interactive API reference for the Hono backend service.
+---
+
+This reference documents the Hono service API specification. Every endpoint described here is interactive, with automated parameter validation, code samples, and live request execution.
+
+## Available Servers
+
+You can target either the cloud staging environment or your local development machine:
+
+```text
+https://api.example.com    (Production)
+http://localhost:3000      (Local Development)
+```
+
+## Quick Endpoint Map
+
+| Category | Endpoint | Method | Security | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **System** | `/health` | `GET` | Public | System uptime & health check |
+| **Auth** | `/auth/login` | `POST` | Public | Issue signed JWT token |
+| **Auth** | `/api/me` | `GET` | Bearer Token | Inspect current user claims |
+| **Projects** | `/api/projects` | `GET` | Bearer Token | List accessible projects |
+| **Projects** | `/api/projects` | `POST` | Bearer Token (Admin) | Create a new project |
+
+<Note type="info" title="Testing with Authentication">
+  Before invoking `/api/*` endpoints, send a login request to `/auth/login` to obtain an access token, then configure it in the [Authentication](/api/authentication) tab.
+</Note>

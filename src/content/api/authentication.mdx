@@ -1,0 +1,53 @@
+---
+title: Authentication
+description: How to authenticate API requests with JSON Web Tokens (JWT).
+---
+
+All endpoints under the `/api/*` path require a valid Bearer token provided in the `Authorization` request header.
+
+## Sending the Bearer Token
+
+Attach your token using the standard HTTP Authorization header format:
+
+```bash
+curl -X GET https://api.example.com/api/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+## Obtaining a Token
+
+Submit valid user credentials to the `/auth/login` endpoint:
+
+```bash
+curl -X POST https://api.example.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "P@ssword123"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "token_type": "Bearer",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expires_in": 3600
+}
+```
+
+## Token Expiration and Renewal
+
+Access tokens are valid for **3600 seconds (1 hour)** from issuance. If a token has expired or the cryptographic signature fails verification, the API immediately returns `HTTP 401 Unauthorized`:
+
+```json
+{
+  "success": false,
+  "message": "Unauthorized: Token expired or invalid signature"
+}
+```
+
+<Tip>
+  For detailed steps on configuring token signing, custom payload typing, and handling CORS preflights with JWT in Hono, see our practical guide: [Securing APIs with JWT Authentication](/guides/jwt-authentication).
+</Tip>

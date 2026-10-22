@@ -1,0 +1,354 @@
+---
+title: Securing APIs with JWT Authentication
+description: Implement token generation, route protection middleware, custom context typing, and practical troubleshooting in Hono.
+---
+
+This guide walks you through building an end-to-end authentication layer for Hono APIs using JSON Web Tokens (JWT). You will learn how to issue signed tokens upon login, protect specific route groups, enforce role-based access control, and resolve common production pitfalls.
+
+## Architectural overview
+
+Modern web architectures separate public and private endpoints:
+1. **Public routes** (`/auth/login`, `/health`): Open to unauthenticated clients.
+2. **Authentication barrier**: The client presents credentials, receives a signed JWT, and attaches it as `Authorization: Bearer <token>` in subsequent calls.
+3. **Protected routes** (`/api/v1/projects/*`): Hono's `jwt()` middleware intercepts requests, validates cryptographic signatures and expiration timestamps, and injects the decoded payload into Hono's `Context`.
+
+---
+
+## Prerequisites and dependencies
+
+Install the standard Hono JWT utilities and the Node server runner if you are executing on Node.js:
+
+```bash
+npm install hono @hono/node-server
+```
+
+<Note type="tip" title="Built-in middleware">
+  The `hono/jwt` module is bundled directly into the core `hono` package. You do not need to install additional libraries like `jsonwebtoken`.
+</Note>
+
+---
+
+<Steps>
+  <Step title="Define custom Context variables in TypeScript">
+    To ensure type safety when accessing user data from the JWT payload across route handlers, define a custom `Variables` type and pass it into the `Hono` generic:
+
+    ```typescript
+    import { Hono } from 'hono'
+
+    // Define the shape of your decoded JWT claims
+    export interface AppJWTPayload {
+      sub: string
+      email: string
+      role: 'admin' | 'developer' | 'viewer'
+      exp: number
+    }
+
+    // Extend Hono's Context variable definitions
+    export type AppVariables = {
+      jwtPayload: AppJWTPayload
+    }
+
+    export const app = new Hono<{ Variables: AppVariables }>()
+    ```
+  </Step>
+
+  <Step title="Implement the complete authentication server">
+    Create or update `src/server.ts` with the complete implementation:
+
+    ```typescript
+    import { serve } from '@hono/node-server'
+    import { Hono } from 'hono'
+    import { jwt, sign } from 'hono/jwt'
+    import { cors } from 'hono/cors'
+    import { logger } from 'hono/logger'
+
+    // 1. Types & Application Setup
+    export interface AppJWTPayload {
+      sub: string
+      email: string
+      role: 'admin' | 'developer' | 'viewer'
+      exp: number
+    }
+
+    type Env = {
+      Variables: {
+        jwtPayload: AppJWTPayload
+      }
+    }
+
+    const app = new Hono<Env>()
+    const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-dev-key-change-in-production'
+
+    // 2. Global Middleware (Order matters!)
+    app.use('*', logger())
+    app.use('*', cors({
+      origin: ['http://localhost:5173', 'https://myapp.com'],
+      allowHeaders: ['Authorization', 'Content-Type'],
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    }))
+
+    // 3. Public Endpoints
+    app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
+
+    app.post('/auth/login', async (c) => {
+      const body = await c.req.json().catch(() => ({}))
+      const { email, password } = body
+
+      // Mock credential check (replace with database lookup and argon2/bcrypt verify)
+      if (email === 'admin@example.com' && password === 'P@ssword123') {
+        const payload: AppJWTPayload = {
+          sub: 'usr_98124',
+          email,
+          role: 'admin',
+          exp: Math.floor(Date.now() / 1000) + 60 * 60 // 1 hour expiration
+        }
+
+        const token = await sign(payload, JWT_SECRET, 'HS256')
+
+        return c.json({
+          success: true,
+          token_type: 'Bearer',
+          access_token: token,
+          expires_in: 3600
+        })
+      }
+
+      return c.json({ success: false, message: 'Invalid email or password' }, 401)
+    })
+
+    // 4. Protected Sub-router
+    const api = new Hono<Env>()
+
+    // Apply JWT verification middleware to all routes under /api/*
+    api.use('*', jwt({
+      secret: JWT_SECRET,
+      alg: 'HS256'
+    }))
+
+    // Endpoint available to any authenticated user
+    api.get('/me', (c) => {
+      const user = c.get('jwtPayload')
+      return c.json({
+        success: true,
+        authenticatedUser: user
+      })
+    })
+
+    // Role-guarded endpoint (Admin only)
+    api.post('/projects', async (c) => {
+      const user = c.get('jwtPayload')
+
+      if (user.role !== 'admin') {
+        return c.json({
+          success: false,
+          error: 'Forbidden: Admin privilege required'
+        }, 403)
+      }
+
+      const { name } = await c.req.json().catch(() => ({ name: 'Default Project' }))
+
+      return c.json({
+        success: true,
+        message: 'Project created successfully',
+        project: {
+          id: `prj_${Date.now()}`,
+          name,
+          createdBy: user.email
+        }
+      }, 201)
+    })
+
+    // Mount the protected router
+    app.route('/api', api)
+
+    // Global Error Handler
+    app.onError((err, c) => {
+      console.error('Unhandled server error:', err)
+      return c.json({
+        success: false,
+        error: err.message || 'Internal Server Error'
+      }, 500)
+    })
+
+    // Launch server
+    serve({ fetch: app.fetch, port: 3000 })
+    console.log('Secure Hono server active on http://localhost:3000')
+    ```
+  </Step>
+
+  <Step title="Verify authentication flows with curl">
+    Verify the endpoints in terminal to test positive and negative scenarios:
+
+    #### Scenario A: Obtain a valid token
+    ```bash
+    curl -X POST http://localhost:3000/auth/login \
+      -H "Content-Type: application/json" \
+      -d '{"email":"admin@example.com","password":"P@ssword123"}'
+    ```
+    *Output:*
+    ```json
+    {
+      "success": true,
+      "token_type": "Bearer",
+      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "expires_in": 3600
+    }
+    ```
+
+    #### Scenario B: Request protected endpoint with token
+    ```bash
+    TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    curl -s http://localhost:3000/api/me \
+      -H "Authorization: Bearer $TOKEN"
+    ```
+    *Output (HTTP 200 OK):*
+    ```json
+    {
+      "success": true,
+      "authenticatedUser": {
+        "sub": "usr_98124",
+        "email": "admin@example.com",
+        "role": "admin",
+        "exp": 1774300000
+      }
+    }
+    ```
+
+    #### Scenario C: Unauthenticated request rejected
+    ```bash
+    curl -i http://localhost:3000/api/me
+    ```
+    *Output (HTTP 401 Unauthorized):*
+    ```output
+    HTTP/1.1 401 Unauthorized
+    content-type: text/plain;charset=UTF-8
+    Unauthorized
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Troubleshooting & common pitfalls
+
+When deploying JWT authentication in production, developers frequently encounter the following issues. Use this reference to diagnose and resolve them rapidly.
+
+### 1. `JwtTokenSignatureMismatched` or 401 on valid tokens
+
+<Accordion title="How to diagnose and fix signature mismatches">
+
+**Symptom**:
+The request returns `401 Unauthorized` with error text or header indicating signature validation failure, even though the token appears correctly generated.
+
+**Root Causes & Solutions**:
+1. **Secret key mismatch**: Ensure the signing key (`sign()`) and verification key (`jwt({ secret })`) are identical. In multi-instance or serverless environments, verify that all instances load the identical `JWT_SECRET` environment variable.
+2. **Algorithm mismatch**: If you sign with `HS256`, the verification middleware must specify `alg: 'HS256'` or accept it. If no algorithm is specified, verify that the algorithm header matches.
+3. **Trailing whitespace in secrets**: When copying secrets into `.env` or cloud secret managers, unintended newline characters (`\n`) will alter the HMAC hash. Trim keys with `process.env.JWT_SECRET.trim()`.
+4. **Header formatting**: The `Authorization` header must strictly follow the format:
+   ```text
+   Authorization: Bearer <token>
+   ```
+   Notice the single space between `Bearer` and the token string.
+
+</Accordion>
+
+### 2. TypeScript error: `Property 'jwtPayload' does not exist on type 'Context'`
+
+<Accordion title="How to resolve context variable typing">
+
+**Symptom**:
+TypeScript compiler throws error TS2339 when calling `c.get('jwtPayload')`.
+
+**Cause**:
+By default, Hono's `Context` does not know what variables custom middleware stores.
+
+**Solution**:
+Pass a generic type parameter specifying your `Variables` when creating your `Hono` app or router:
+```typescript
+type AppVariables = {
+  jwtPayload: {
+    sub: string
+    role: string
+  }
+}
+
+// Pass AppVariables into Hono generic
+const app = new Hono<{ Variables: AppVariables }>()
+
+app.get('/profile', (c) => {
+  // Now fully typed with autocomplete!
+  const user = c.get('jwtPayload')
+  return c.text(`User ID: ${user.sub}`)
+})
+```
+
+</Accordion>
+
+### 3. Browser CORS preflight requests fail with 401 Unauthorized
+
+<Accordion title="Fixing middleware order for CORS preflight (OPTIONS)">
+
+**Symptom**:
+Web browser fetch requests fail with CORS errors in DevTools, reporting that the preflight `OPTIONS` request received an HTTP 401 status.
+
+**Cause**:
+When browser applications make authenticated requests, the browser sends an unauthenticated `OPTIONS` preflight request first without headers. If `jwt()` runs before `cors()`, it blocks the `OPTIONS` request before CORS headers can be attached.
+
+**Solution**:
+Always register `cors()` **before** `jwt()` middleware:
+```typescript
+// ✅ CORRECT ORDER: CORS first, then JWT
+app.use('*', cors({
+  origin: '*',
+  allowHeaders: ['Authorization', 'Content-Type']
+}))
+
+app.use('/api/*', jwt({ secret: JWT_SECRET }))
+```
+
+</Accordion>
+
+### 4. Edge Runtime vs Node.js environment variable access
+
+<Accordion title="Accessing secrets in Cloudflare Workers and Edge runtimes">
+
+**Symptom**:
+`process.env.JWT_SECRET` is `undefined` when running on Cloudflare Workers or Fastly.
+
+**Cause**:
+Edge workers do not have a global `process` object. Secrets and bindings are provided per-request on the `c.env` context object.
+
+**Solution**:
+Use `c.env` when writing multi-runtime or edge-native Hono handlers:
+```typescript
+type Bindings = {
+  JWT_SECRET: string
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
+
+app.post('/login', async (c) => {
+  // c.env works seamlessly across Cloudflare Workers and Miniflare
+  const secret = c.env.JWT_SECRET
+  const token = await sign({ sub: '123' }, secret)
+  return c.json({ token })
+})
+```
+
+</Accordion>
+
+---
+
+## Best practices checklist
+
+<Steps>
+  <Step title="Set reasonable expiration times">
+    Never issue indefinite tokens. Standard access tokens should expire within **15 minutes to 1 hour**. Use short-lived access tokens paired with refresh tokens for persistent sessions.
+  </Step>
+  <Step title="Keep payload sizes minimal">
+    JWTs are transmitted with every HTTP request in the header. Only include essential identifiers (`sub`, `role`, `tenantId`). Avoid storing large profile objects or sensitive data like passwords.
+  </Step>
+  <Step title="Rotate secrets in production">
+    Use asymmetric signing keys (such as `RS256` or `EdDSA`) with a key rotation strategy if your architecture involves multiple microservices verifying tokens independently.
+  </Step>
+</Steps>

@@ -1,0 +1,82 @@
+---
+title: Introduction to Hono
+description: An ultrafast, lightweight, multi-runtime web framework built on Web Standards.
+mode: home
+---
+
+<Hero
+  title="Build ultrafast APIs on any JavaScript runtime"
+  subtitle="Hono is a lightweight, type-safe web framework engineered for Cloudflare Workers, Node.js, Bun, Deno, and the modern edge."
+  primaryLabel="Get started"
+  primaryHref="/quickstart"
+  secondaryLabel="Explore guides"
+  secondaryHref="/guides/jwt-authentication"
+/>
+
+## What is Hono?
+
+**Hono** (meaning *flame* in Japanese) is a small, simple, and blazing-fast web framework built strictly on **Web Standards** (`Request`, `Response`, `fetch`, and the `URL` API). 
+
+Unlike legacy frameworks that couple directly to the Node.js HTTP runtime, Hono code runs natively across all modern JavaScript runtimes without polyfills or vendor lock-in.
+
+<CardGroup cols="2">
+  <Card title="Start in 5 minutes" icon="party-horn" href="/quickstart">
+    Follow the quickstart to scaffold a project, configure routing, and verify your first JSON endpoint.
+  </Card>
+  <Card title="Securing your API" icon="shield-check" href="/guides/jwt-authentication">
+    Read the practical guide to implement JWT authentication, route guards, and troubleshooting strategies.
+  </Card>
+  <Card title="Explore the API reference" icon="code-simple" href="/api/introduction">
+    Inspect interactive OpenAPI endpoints and test requests directly in your browser.
+  </Card>
+  <Card title="Multi-runtime deployment" icon="cloud" href="/guides/jwt-authentication">
+    Deploy seamlessly to Cloudflare Workers, Node.js, Bun, Vercel, or AWS Lambda.
+  </Card>
+</CardGroup>
+
+---
+
+## Who is Hono for?
+
+Hono is crafted specifically for developers seeking speed, minimal overhead, and modern developer ergonomics:
+
+- **Backend & API Engineers**: Build high-throughput microservices, REST APIs, and GraphQL gateways with zero third-party dependencies in the core framework.
+- **Edge & Serverless Developers**: Deploy cold-start-critical functions to Cloudflare Workers, Fastly Compute, AWS Lambda, or Vercel Edge with a bundle footprint under **14 kB**.
+- **Fullstack TypeScript Teams**: Leverage end-to-end type safety with Hono's RPC client, sharing API route types directly with frontend frameworks (React, Next.js, Vue, Svelte) without manual code generation.
+- **Developers Migrating from Express**: Retain familiar Express-like routing syntax (`app.get()`, `app.post()`, middleware chaining) while upgrading to modern `async/await` and Web Standard primitives.
+
+---
+
+## Core architecture and pillars
+
+### 1. Zero dependencies and ultra-lightweight
+The core Hono package has zero external dependencies and weighs under **14 kB** minified. It introduces negligible latency, making it ideal for edge networks where cold boot times directly impact user experience.
+
+### 2. RegExpRouter: Blazing routing performance
+Hono uses a specialized regular expression-based router (`RegExpRouter`) that compiles all registered route paths into unified regular expressions. Route matching completes in sub-microsecond time, even across hundreds of parameterized routes.
+
+### 3. Native Web Standards
+Every request in Hono is an instance of the Web Standard [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request), and every handler returns a Web Standard [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response). If you know the Fetch API, you already know Hono.
+
+### 4. Built-in battery of middleware
+Hono ships with production-ready middleware out of the box:
+- **Authentication**: JWT, Bearer token, Basic auth
+- **Security**: CORS, Secure Headers, CSRF protection
+- **Observability**: Logger, Timing, Request ID
+- **Validation**: Schema validation adapters for Zod, Valibot, and TypeBox
+
+---
+
+## Framework comparison
+
+| Feature | Hono | Express | Fastify |
+| :--- | :--- | :--- | :--- |
+| **Core size** | `< 14 kB` | `~200 kB` | `~300 kB` |
+| **Runtime support** | Universal (Cloudflare, Bun, Deno, Node) | Node.js only | Node.js only |
+| **Web Standards API** | Yes (`fetch`, `Request`, `Response`) | No (`req`, `res` streams) | No (custom abstractions) |
+| **Type-Safe RPC** | Built-in | Requires tRPC / OpenAPI gen | Requires TypeBox / tRPC |
+| **Cold start speed** | Sub-millisecond | High overhead | Moderate overhead |
+
+<Note type="info" title="Ready to build?">
+  Proceed to the [Quickstart](/quickstart) to scaffold your first Hono service and test a live endpoint in under five minutes.
+</Note>

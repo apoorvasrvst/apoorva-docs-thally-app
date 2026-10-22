@@ -1,0 +1,71 @@
+{
+  "theme": "default",
+  "appearance": {
+    "contentIcons": "accent"
+  },
+  "markdown": {
+    "enabled": true
+  },
+  "i18n": {
+    "defaultLocale": "en",
+    "locales": [
+      {
+        "code": "en",
+        "label": "English"
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "label": "Quickstart",
+      "href": "/quickstart"
+    }
+  },
+  "tabs": [
+    {
+      "tab": "Get started",
+      "groups": [
+        {
+          "group": "Overview",
+          "pages": [
+            "introduction",
+            "quickstart"
+          ]
+        }
+      ]
+    },
+    {
+      "tab": "Guides",
+      "groups": [
+        {
+          "group": "Security & Auth",
+          "pages": [
+            "guides/jwt-authentication"
+          ]
+        }
+      ]
+    },
+    {
+      "tab": "API Reference",
+      "groups": [
+        {
+          "group": "Overview",
+          "pages": [
+            "api/introduction",
+            "api/authentication"
+          ]
+        }
+      ],
+      "api": {
+        "source": "openapi.yaml"
+      }
+    },
+    {
+      "tab": "Changelog",
+      "href": "/changelog"
+    }
+  ],
+  "ai": {
+    "chat": true
+  }
+}
